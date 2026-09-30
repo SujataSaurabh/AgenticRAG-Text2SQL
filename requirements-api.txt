@@ -1,0 +1,10 @@
+# API image dependencies. torch is installed separately from the CPU-only
+# wheel index in Dockerfile (avoids ~3 GB of unused CUDA libraries).
+fastapi
+uvicorn[standard]
+transformers
+accelerate
+chromadb
+sentence-transformers
+pydantic
+pandas

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+pipeline.log
+.DS_Store
+# Data extract is kept in GCS, not in this public repo
+database.db
+*.db
+*.csv
+*.sqlite
+key.json
+*.json.key

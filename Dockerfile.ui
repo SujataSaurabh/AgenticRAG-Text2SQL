@@ -1,0 +1,15 @@
+# ---- Streamlit chat UI ----
+FROM python:3.10-slim
+
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+COPY requirements-ui.txt .
+RUN pip install -r requirements-ui.txt
+
+COPY ui.py .
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["sh", "-c", "exec streamlit run ui.py --server.port=${PORT:-8080} --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"]

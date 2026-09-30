@@ -1,8 +1,11 @@
 fastapi
-uvicorn
+uvicorn[standard]
 torch
 transformers
 accelerate
 chromadb
 sentence-transformers
 pydantic
+pandas
+streamlit
+requests
