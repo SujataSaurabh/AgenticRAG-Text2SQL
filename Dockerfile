@@ -1,5 +1,5 @@
 # ---- Text2SQL RAG API (FastAPI + Qwen on CPU) ----
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -12,8 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 WORKDIR /src
 
-# CPU-only PyTorch first, then the rest
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+# CPU-only PyTorch. --extra-index-url lets pip fetch torch's own dependencies
+# (setuptools, sympy, ...) from PyPI when the PyTorch index lacks a new enough copy.
+ARG TORCH_VERSION=2.14.0
+RUN pip install "torch==${TORCH_VERSION}" \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple
 COPY requirements-api.txt .
 RUN pip install -r requirements-api.txt
 

@@ -1,10 +1,13 @@
-# API image dependencies. torch is installed separately from the CPU-only
-# wheel index in Dockerfile (avoids ~3 GB of unused CUDA libraries).
-fastapi
-uvicorn[standard]
-transformers
+# API image dependencies, pinned to the versions tested locally.
+# torch is installed first from the CPU-only index in Dockerfile; the pin here
+# matches it (2.14.0+cpu satisfies ==2.14.0) so pip won't swap in the CUDA build.
+torch==2.14.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+transformers==5.17.0
 accelerate
-chromadb
-sentence-transformers
-pydantic
-pandas
+chromadb==1.5.9
+sentence-transformers==6.1.0
+pydantic==2.13.5
+pandas==3.0.6
+huggingface_hub==1.33.0
