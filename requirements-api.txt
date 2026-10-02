@@ -1,13 +1,10 @@
-# API image dependencies, pinned to the versions tested locally.
-# torch is installed first from the CPU-only index in Dockerfile; the pin here
-# matches it (2.14.0+cpu satisfies ==2.14.0) so pip won't swap in the CUDA build.
-torch==2.14.0
+# API image dependencies (Cloud Run, LLM_BACKEND=vertex). No torch.
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
-transformers==5.17.0
-accelerate
-chromadb==1.5.9
-sentence-transformers==6.1.0
 pydantic==2.13.5
 pandas==3.0.6
-huggingface_hub==1.33.0
+google-genai==2.25.0
+sqlglot==30.21.0
+# PostgreSQL / Cloud SQL (DB_BACKEND=postgres)
+cloud-sql-python-connector[pg8000]==1.22.0
+pg8000==1.31.5

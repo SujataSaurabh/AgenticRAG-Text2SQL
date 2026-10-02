@@ -76,7 +76,7 @@ for message in st.session_state.messages:
         # If this message contained table/report data, render the table & download button
         if message.get("data") and message.get("columns"):
             df = pd.DataFrame(message["data"], columns=message["columns"])
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
             
             csv_data = df.to_csv(index=False).encode('utf-8')
             st.download_button(

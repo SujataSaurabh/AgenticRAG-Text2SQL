@@ -1,11 +1,8 @@
-fastapi
-uvicorn[standard]
-torch
-transformers
+# Local development (API + UI + offline Qwen model, LLM_BACKEND=local)
+-r requirements-api.txt
+torch==2.14.0
+transformers==5.17.0
 accelerate
-chromadb
-sentence-transformers
-pydantic
-pandas
-streamlit
-requests
+streamlit==1.64.0
+requests==2.34.2
+google-auth
