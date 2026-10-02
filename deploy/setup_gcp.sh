@@ -19,21 +19,28 @@ gcloud config set project "$PROJECT_ID"
 
 echo "== Enabling APIs"
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
-  iam.googleapis.com storage.googleapis.com logging.googleapis.com
+  iam.googleapis.com storage.googleapis.com logging.googleapis.com \
+  aiplatform.googleapis.com iap.googleapis.com
+# Make sure the IAP service agent exists (it forwards signed-in users to Cloud Run)
+gcloud beta services identity create --service=iap.googleapis.com --project="$PROJECT_ID" >/dev/null
 
 echo "== Artifact Registry repo"
 gcloud artifacts repositories describe "$REPOSITORY" --location="$REGION" >/dev/null 2>&1 \
   || gcloud artifacts repositories create "$REPOSITORY" --repository-format=docker \
        --location="$REGION" --description="ALSPubsChat images"
 
-echo "== Runtime service accounts (no project roles needed)"
+echo "== Runtime service accounts"
 for sa in pubschat-api pubschat-ui; do
   gcloud iam service-accounts describe "${sa}@${PROJECT_ID}.iam.gserviceaccount.com" >/dev/null 2>&1 \
     || gcloud iam service-accounts create "$sa" --display-name="ALSPubsChat ${sa#pubschat-}"
 done
 
+echo "== API service account may call Gemini on Vertex AI"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${API_SA}" --role=roles/aiplatform.user --condition=None >/dev/null
+
 echo "== Deployer permissions for ${DEPLOYER_SA}"
-for role in roles/run.admin roles/artifactregistry.writer roles/logging.viewer; do
+for role in roles/run.admin roles/artifactregistry.writer roles/logging.viewer roles/iap.admin; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${DEPLOYER_SA}" --role="$role" --condition=None >/dev/null
 done

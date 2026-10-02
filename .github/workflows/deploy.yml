@@ -17,6 +17,13 @@ env:
   UI_SERVICE: text2sql-ui
   API_SA: pubschat-api
   UI_SA: pubschat-ui
+  # Gemini model on Vertex AI (change here to switch models)
+  GEMINI_MODEL: gemini-3.5-flash-lite
+  # Database: sqlite (bundled file) or postgres (Cloud SQL). Set the repo
+  # variable DB_BACKEND to switch without editing this file.
+  DB_BACKEND: ${{ vars.DB_BACKEND || 'sqlite' }}
+  CLOUDSQL_INSTANCE: als-user-office-software:us-central1:pubs-reporting
+  DB_NAME: pubsreporting
   # Prebuilt SQLite extract (kept out of the public repo)
   DB_GCS_URI: gs://als-user-office-software-pubschat-data/database.db
 
@@ -27,13 +34,6 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-
-      # The API image is ~9 GB (baked model weights); free runner disk first
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          df -h /
 
       - uses: google-github-actions/auth@v2
         with:
@@ -86,11 +86,10 @@ jobs:
             --image="${{ needs.build-api.outputs.image }}" \
             --service-account="${API_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
             --no-allow-unauthenticated \
-            --execution-environment=gen2 \
-            --memory=16Gi --cpu=4 --cpu-boost \
-            --concurrency=1 --max-instances=2 --min-instances=0 \
-            --timeout=300 \
-            --set-env-vars=TORCH_THREADS=4
+            --memory=512Mi --cpu=1 --cpu-boost \
+            --concurrency=4 --max-instances=2 --min-instances=0 \
+            --timeout=120 \
+            --set-env-vars="LLM_BACKEND=vertex,GEMINI_MODEL=${GEMINI_MODEL},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=global,DB_BACKEND=${DB_BACKEND},CLOUDSQL_INSTANCE=${CLOUDSQL_INSTANCE},DB_NAME=${DB_NAME},DB_USER=${API_SA}@${PROJECT_ID}.iam"
 
       - name: Allow the UI to call the API
         run: |
@@ -99,7 +98,7 @@ jobs:
             --member="serviceAccount:${UI_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
             --role=roles/run.invoker
 
-      - name: Deploy UI (private)
+      - name: Deploy UI (behind IAP, Google sign-in)
         run: |
           API_URL=$(gcloud run services describe "$API_SERVICE" \
             --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
@@ -108,18 +107,33 @@ jobs:
             --image="${{ needs.build-ui.outputs.image }}" \
             --service-account="${UI_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
             --no-allow-unauthenticated \
+            --iap \
             --memory=1Gi --cpu=1 \
             --max-instances=2 --min-instances=0 \
             --session-affinity \
             --timeout=3600 \
-            --set-env-vars="FASTAPI_URL=${API_URL}/query,API_AUDIENCE=${API_URL},REQUEST_TIMEOUT=300"
+            --set-env-vars="FASTAPI_URL=${API_URL}/query,API_AUDIENCE=${API_URL},REQUEST_TIMEOUT=120"
+
+      - name: Let IAP forward signed-in users to the UI
+        run: |
+          # Who may sign in (e.g. domain:lbl.gov) is set once by deploy/grant_lab_access.sh
+          PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+          gcloud run services add-iam-policy-binding "$UI_SERVICE" \
+            --project="$PROJECT_ID" --region="$REGION" \
+            --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-iap.iam.gserviceaccount.com" \
+            --role=roles/run.invoker
 
       - name: Smoke test API health
         run: |
           API_URL=$(gcloud run services describe "$API_SERVICE" \
             --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
           TOKEN=$(gcloud auth print-identity-token --audiences="$API_URL")
-          curl -fsS --max-time 290 -H "Authorization: Bearer $TOKEN" "$API_URL/health"
+          curl -fsS --max-time 60 -H "Authorization: Bearer $TOKEN" "$API_URL/health"
+          # End-to-end check that Vertex AI + the database work (costs < $0.001)
+          curl -fsS --max-time 110 -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"question":"How many publications are there in 2019?","history":[]}' \
+            "$API_URL/query"
 
       - name: Show Cloud Run logs on failure
         if: failure()
